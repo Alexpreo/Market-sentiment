@@ -1,0 +1,12 @@
+yfinance
+GoogleNews
+requests
+beautifulsoup4
+transformers
+torch
+pandas
+schedule
+streamlit
+plotly
+python-dotenv
+
