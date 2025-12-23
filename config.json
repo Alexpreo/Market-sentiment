@@ -1,0 +1,10 @@
+{
+  "tickers_and_sectors": [
+    "Gold",
+    "TSLA"
+  ],
+  "sectors": [
+    "Gold"
+  ],
+  "articles_per_ticker": 100
+}

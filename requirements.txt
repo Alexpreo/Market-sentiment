@@ -1,4 +1,4 @@
-yfinance
+yfinance<0.2.0
 GoogleNews
 requests
 beautifulsoup4

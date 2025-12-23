@@ -49,6 +49,8 @@ python3 -m streamlit run dashboard.py
 
 Edit `tracker.py` to customize:
 - `TICKERS_AND_SECTORS`: List of tickers/sectors to track (default: `['AAPL', 'NVDA', 'Semiconductors']`)
+- `SECTORS`: List of sector names that should use sector news fetching (default: `['Semiconductors']`)
+  - Add any sector names here (e.g., `'Technology'`, `'Energy'`, `'Healthcare'`) to fetch sector news instead of ticker news
 - `ARTICLES_PER_TICKER`: Number of articles to fetch per cycle (default: `25`)
 - Analysis interval: Currently set to 10 minutes (change in `schedule.every(10).minutes.do(job)`)
 

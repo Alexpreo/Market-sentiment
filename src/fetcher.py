@@ -19,7 +19,7 @@ class NewsFetcher:
     
     def fetch_ticker_news(self, ticker: str, max_articles: int = 25) -> List[Dict]:
         """
-        Fetch news for a specific ticker using yfinance.
+        Fetch news for a specific ticker using yfinance, with GoogleNews fallback.
         
         Args:
             ticker: Stock ticker symbol (e.g., 'AAPL')
@@ -30,27 +30,106 @@ class NewsFetcher:
         """
         articles = []
         
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                stock = yf.Ticker(ticker)
+                time.sleep(0.5)
+                
+                try:
+                    news_data = stock.news
+                    if news_data and isinstance(news_data, list) and len(news_data) > 0:
+                        for item in news_data[:max_articles]:
+                            if isinstance(item, dict):
+                                title = item.get('title', '') or item.get('headline', '') or item.get('summary', '')
+                                if title and title.strip():
+                                    article = {
+                                        'title': title.strip(),
+                                        'date': self._parse_date(item.get('providerPublishTime', item.get('pubDate', item.get('datetime', 0)))),
+                                        'link': item.get('link', item.get('url', item.get('guid', '')))
+                                    }
+                                    articles.append(article)
+                        if articles:
+                            return articles
+                except Exception as e:
+                    if attempt == 0:
+                        print(f"yfinance news failed for {ticker}: {e}")
+                    pass
+                        
+            except Exception as e:
+                if attempt == 0:
+                    print(f"Error with yfinance for {ticker}: {e}")
+                pass
+        
+        if not articles:
+            print(f"Falling back to GoogleNews for {ticker}...")
+            articles = self._fetch_googlenews_paginated(f"{ticker} stock news", max_articles)
+            
+        return articles
+    
+    def _fetch_googlenews_paginated(self, query: str, max_articles: int) -> List[Dict]:
+        """Fetch articles from GoogleNews with pagination to get more than 10 articles."""
+        articles = []
         try:
-            stock = yf.Ticker(ticker)
-            news_data = stock.news
+            googlenews = GoogleNews()
+            googlenews.setlang('en')
+            googlenews.setencode('utf-8')
+            googlenews.search(query)
             
-            if news_data:
-                for item in news_data[:max_articles]:
-                    article = {
-                        'title': item.get('title', ''),
-                        'date': self._parse_date(item.get('providerPublishTime', 0)),
-                        'link': item.get('link', '')
-                    }
-                    articles.append(article)
+            page = 1
+            seen_titles = set()
+            
+            while len(articles) < max_articles:
+                try:
+                    if page == 1:
+                        results = googlenews.result()
+                    else:
+                        googlenews.get_page(page)
+                        results = googlenews.result()
                     
-        except Exception as e:
-            print(f"Error fetching news for {ticker}: {e}")
+                    if not results or len(results) == 0:
+                        break
+                    
+                    new_count = 0
+                    for item in results:
+                        if len(articles) >= max_articles:
+                            break
+                        
+                        title = item.get('title', '')
+                        if title and title not in seen_titles:
+                            seen_titles.add(title)
+                            article = {
+                                'title': title,
+                                'date': self._parse_date_google(item.get('date', '')),
+                                'link': item.get('link', '')
+                            }
+                            articles.append(article)
+                            new_count += 1
+                    
+                    if new_count == 0:
+                        break
+                    
+                    page += 1
+                    time.sleep(1)
+                    
+                    if page > 10:
+                        break
+                        
+                except Exception as e:
+                    if page == 1:
+                        print(f"Error fetching GoogleNews page {page}: {e}")
+                    break
             
+            googlenews.clear()
+            time.sleep(1)
+        except Exception as e:
+            print(f"Error with GoogleNews pagination: {e}")
+        
         return articles
     
     def fetch_sector_news(self, sector: str, max_articles: int = 25) -> List[Dict]:
         """
-        Fetch sector-related news using GoogleNews.
+        Fetch sector-related news using GoogleNews with pagination.
         
         Args:
             sector: Sector name or keyword (e.g., 'Semiconductors')
@@ -59,32 +138,7 @@ class NewsFetcher:
         Returns:
             List of dictionaries with keys: {'title': str, 'date': str, 'link': str}
         """
-        articles = []
-        
-        try:
-            googlenews = GoogleNews()
-            googlenews.search(f"{sector} finance stock market")
-            googlenews.setlang('en')
-            googlenews.setencode('utf-8')
-            
-            results = googlenews.result()
-            
-            for item in results[:max_articles]:
-                article = {
-                    'title': item.get('title', ''),
-                    'date': self._parse_date_google(item.get('date', '')),
-                    'link': item.get('link', '')
-                }
-                articles.append(article)
-            
-            googlenews.clear()
-            
-            time.sleep(1)
-            
-        except Exception as e:
-            print(f"Error fetching sector news for {sector}: {e}")
-            
-        return articles
+        return self._fetch_googlenews_paginated(f"{sector} finance stock market", max_articles)
     
     def _parse_date(self, timestamp) -> str:
         """
